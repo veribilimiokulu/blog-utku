@@ -1,0 +1,2643 @@
+---
+title: "Veri Görselleştirme ve Bazı Parametrelerin Üretimi"
+author: "Detectos"
+output: html_document
+---
+
+# 1. Packages
+```{r warning=FALSE, message=FALSE}
+library(tidyverse) # Data Manipulation & Visualization
+library(stringr) # String Manipulation
+library(magrittr) # For  %<>% Operator 
+library(DataExplorer) # Missing Values
+library(vroom) # Data Import
+library(e1071) # Skewness & Kurtosis
+library(lubridate) # Date Manipulation
+library(GGally) # Data Visualization & Correlation
+library(gridExtra) # Data Visualization
+library(rvest) # Web Scraping
+```
+
+
+```{r}
+options(scipen = 999)
+test <- vroom("../input/test.csv", delim = ",")
+train <- vroom("../input/train.csv", delim = ",")
+```
+
+# Test Verisi
+# EKsik Veriler
+
+```{r}
+missingTest <- plot_missing(test) 
+missingTest %<>% mutate(index = row_number())
+```
+
+# Tarih Formatı ve Tarih Bazlı Değişken Üretimi 
+
+```{r}
+test_temp <- test %>% 
+  mutate(date_time = ymd(20171201) %>% 
+           as_datetime() %>% add(seconds(TransactionDT))) %>% 
+  select(-TransactionDT) %>% 
+  separate(date_time, c("date", "time"), sep = " ") %>% 
+  mutate(date = ymd(date),
+         quarter = quarter(date),
+         year = year(date),
+         month = month(date),
+         day = day(date),
+         week = week(date),
+         weekday = wday(date, label = TRUE, abbr = FALSE),
+         weekend = if_else(wday(date) %in% c(6,7), TRUE, FALSE),
+         time2 = hms(time),
+         hour = hour(time2),
+         minute = minute(time2),
+         second = second(time2),
+         am_pm = am(time2)) # am or pm
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(test_temp, aes(TransactionAmt), alpha = 0.6)+
+    geom_histogram(fill = "seagreen"),
+  
+  ggplot(test_temp, aes(log(TransactionAmt)), alpha = 0.6)+
+    geom_histogram(fill = "seagreen")
+  
+)
+```
+
+```{r}
+ggplot(test_temp, aes(ProductCD))+
+    geom_bar(fill = "firebrick")+
+    coord_flip()
+```
+
+```{r}
+grid.arrange(
+  
+  test_temp %>% 
+    ggplot(aes(card4))+
+    geom_bar(fill = "firebrick")+
+    coord_flip()+
+    labs(x = NULL),
+  test_temp %>% 
+    ggplot(aes(card6))+
+    geom_bar(fill = "royalblue")+
+    coord_flip()+
+    labs(x = NULL)
+)
+```
+
+
+```{r}
+test_temp %<>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_"))
+```
+
+```{r}
+head(test_temp %>% count(cardnumber) %>% arrange(-n),25) %>% ggplot()+
+  geom_col(aes(reorder(cardnumber, n), n), fill = "royalblue")+
+  coord_flip()+
+  labs(x = "Card Number")
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(test_temp, aes(addr1))+
+    geom_histogram(fill = "purple"),
+  
+  ggplot(test_temp, aes(addr2))+
+    geom_histogram(fill = "purple")
+)
+```
+
+```{r}
+ggplot(test_temp, aes(dist1))+
+    geom_histogram(fill = "orange")
+```
+
+```{r}
+test_temp %<>% select(-dist2)
+```
+
+```{r}
+test_temp %>% 
+  count(P_emaildomain) %>% 
+  ggplot(aes(reorder(P_emaildomain,n), n))+
+  geom_col(fill = "seagreen")+
+  coord_flip()
+```
+
+```{r}
+ggplot(test_temp, aes(P_company))+
+  geom_bar(fill = "pink")+
+  coord_flip()
+```
+
+```{r}
+test_temp %<>% select(-R_emaildomain)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(test_temp, aes(C1))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C2))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C3))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C4))+
+    geom_histogram(fill = "firebrick")
+  
+)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(test_temp, aes(C5))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C6))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C7))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C8))+
+    geom_histogram(fill = "firebrick")
+  
+)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(test_temp, aes(C9))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C10))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C11))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C12))+
+    geom_histogram(fill = "firebrick")
+  
+)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(test_temp, aes(C13))+
+    geom_histogram(fill = "firebrick"),
+
+  ggplot(test_temp, aes(C14))+
+    geom_histogram(fill = "firebrick")  
+)
+```
+
+```{r}
+corC <- ggcorr(test_temp %>% select(C1:C14), method = "p", label = T, label_round =2)
+corC
+```
+
+```{r}
+test_temp <- test_temp %>% 
+  # Değişkenler önce mi çıkarılıacak sonra mı?
+  select(-C3, -C11, - C10, -C12, -C6, -C8, -C7) %>% 
+  mutate(Csum = apply(test_temp %>% select(C1:C14), 1, function(x){sum(x, na.rm = TRUE)}),
+         Csd = apply(test_temp %>% select(C1:C14), 1, function(x){sd(x, na.rm = TRUE)}),
+         Cmean = apply(test_temp %>% select(C1:C14), 1, function(x){mean(x, na.rm = TRUE)}),
+         Ckurtosis = apply(test_temp %>% select(C1:C14), 1, function(x){kurtosis(x, na.rm = TRUE)}),
+         Cskewness = apply(test_temp %>% select(C1:C14), 1, function(x){skewness(x, na.rm = TRUE)}),
+         Ckurtosis = if_else(is.na(Ckurtosis) == TRUE, 0, Ckurtosis),
+         Cskewness = if_else(is.na(Cskewness) == TRUE, 0, Cskewness))
+```
+
+```{r}
+corC2 <- ggcorr(test_temp %>% select(C1:C14, Csum, Csd, Cmean, Ckurtosis, Cskewness), method = "p", label = T, label_round =2)
+corC2
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(test_temp, aes(D1))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D2))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D3))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D4))+
+    geom_histogram(fill = "navy")
+  
+)
+```
+
+
+```{r}
+grid.arrange(
+
+  ggplot(test_temp, aes(D5))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D6))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D7))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D8))+
+    geom_histogram(fill = "navy")
+  
+)
+```
+
+
+```{r}
+grid.arrange(
+
+  ggplot(test_temp, aes(D9))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D10))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D11))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D12))+
+    geom_histogram(fill = "navy")
+  
+)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(test_temp, aes(D13))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D14))+
+    geom_histogram(fill = "navy"),
+
+  ggplot(test_temp, aes(D15))+
+    geom_histogram(fill = "navy")
+  
+)
+```
+
+```{r}
+corD <- ggcorr(test_temp %>% select(D1:D15), method = "p", label = T, label_round =2)
+corD
+```
+
+```{r}
+test_temp  %<>% select(-D6, -D7, -D8, -D9, -D12, -D13, -D14)
+```
+
+```{r}
+corD2 <- ggcorr(test_temp %>% select(D1:D15), method = "p", label = T, label_round =2)
+corD2
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(test_temp %>% filter(!is.na(M1)), aes(M1))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip(),
+  
+  ggplot(test_temp %>% filter(!is.na(M2)), aes(M2))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip(),
+  
+  ggplot(test_temp %>% filter(!is.na(M3)), aes(M3))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip()
+  
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(test_temp %>% filter(!is.na(M4)), aes(M4))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip(),
+  
+  ggplot(test_temp %>% filter(!is.na(M5)), aes(M5))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip(),
+  
+  ggplot(test_temp %>% filter(!is.na(M6)), aes(M6))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip()
+  
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(test_temp %>% filter(!is.na(M7)), aes(M7))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip(),
+  
+  ggplot(test_temp %>% filter(!is.na(M8)), aes(M8))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip(),
+  
+  ggplot(test_temp %>% filter(!is.na(M9)), aes(M9))+
+    geom_bar(fill = "forestgreen")+
+    coord_flip()
+  
+)
+```
+
+```{r}
+test_temp %<>% select(-M1, -M7, -M8, -M9)
+```
+
+```{r}
+removeV <- c("V138", "V139", "V140", "V141", "V142", "V143", "V144", "V145", "V146", "V147", "V148", "V149", "V150", "V151", "V152", "V153", "V154", "V155", "V156", "V157", 
+  "V158", "V159", "V160", "V161", "V162", "V163", "V164", "V165", "V166",  "V167", "V168", "V169", "V170", "V171", "V172", "V173", "V174", "V175", 
+  "V176", "V177", "V178", "V179", "V180", "V181", "V182", "V183", "V184",  "V185", "V186", "V187", "V188", "V189", "V190", "V191", "V192", "V193", "V194", 
+  "V195", "V196", "V197", "V198", "V199", "V200", "V201", "V202", "V203", "V204", "V205", "V206", "V207", "V208", "V209", "V210", "V211", "V212",
+  "V213", "V214", "V215", "V216", "V217", "V218", "V219", "V220", "V221", "V222", "V223", "V224", "V225", "V226", "V227", "V228", "V229", "V230",
+  "V231", "V232", "V233", "V234", "V235", "V236", "V237", "V238", "V239", "V240", "V241", "V242", "V243", "V244", "V245", "V246", "V247", "V248",
+  "V249", "V250", "V251", "V252", "V253", "V254", "V255", "V256", "V257", "V258", "V259", "V260", "V261", "V262", "V263", "V264", "V265", "V266",
+  "V267", "V268", "V269", "V270", "V271", "V272", "V273", "V274", "V275", "V276", "V277", "V278", "V322", "V323", "V324", "V325", "V326", "V327",
+  "V328", "V329", "V330", "V331", "V332", "V333", "V334", "V335", "V336", "V337", "V338", "V339")
+```
+
+```{r}
+test_temp  %<>% select(-V1:-V11, -removeV)
+```
+
+```{r}
+corV <- ggcorr(test_temp %>% select(V12:V50), method = "p", label = T, label_round =2)
+corV
+```
+
+```{r}
+ilk = "V15"
+son = "V16"
+
+# V15 V16'ya benzer mi?
+table(test_temp[ilk] == test_temp[son]); 
+
+# Eksik Gözlem Saysı
+sum(is.na(test_temp[ilk])) ; 
+sum(is.na(test_temp[son]))
+
+# İki değişkenin dağılımı
+table(test_temp[ilk])
+table(test_temp[son])
+```
+
+```{r}
+# Gruplara göre parametreler oluşturma.
+test_temp2 <- test_temp %>% 
+  
+  mutate(
+    
+    #Grup 1
+    Vsum_g1 = apply(test_temp %>% select(V126:V134), 1, function(x){sum(x, na.rm = TRUE)}),
+    Vsd_g1 = apply(test_temp %>% select(V126:V134), 1,  function(x){sd(x, na.rm = TRUE)}),
+    Vmean_g1 = apply(test_temp %>% select(V126:V134), 1,  function(x){mean(x, na.rm = TRUE)}),
+    Vkurtosis_g1 = apply(test_temp %>% select(V126:V134), 1,  function(x){kurtosis(x, na.rm = TRUE)}),
+    Vskewnes_g1 = apply(test_temp %>% select(V126:V134), 1,  function(x){skewness(x, na.rm = TRUE)}),
+    Vkurtosis_g1 = if_else(is.na(Vkurtosis_g1) == TRUE, 0, Vkurtosis_g1),
+    Vskewnes_g1 = if_else(is.na(Vskewnes_g1) == TRUE, 0, Vskewnes_g1),
+    
+    #Grup 2
+    Vsum_g2 = apply(test_temp %>% select(V306:V321), 1, function(x){sum(x, na.rm = TRUE)}),
+    Vsd_g2 = apply(test_temp %>% select(V306:V321), 1,  function(x){sd(x, na.rm = TRUE)}),
+    Vmean_g2 = apply(test_temp %>% select(V306:V321), 1,  function(x){mean(x, na.rm = TRUE)}),
+    Vkurtosis_g2 = apply(test_temp %>% select(V306:V321), 1,  function(x){kurtosis(x, na.rm = TRUE)}),
+    Vskewnes_g2 = apply(test_temp %>% select(V306:V321), 1,  function(x){skewness(x, na.rm = TRUE)}),
+    Vkurtosis_g2 = if_else(is.na(Vkurtosis_g2) == TRUE, 0, Vkurtosis_g2),
+    Vskewnes_g2 = if_else(is.na(Vskewnes_g2) == TRUE, 0, Vskewnes_g2)
+           
+         )
+```
+
+```{r}
+test_temp2 <- test_temp2 %>% select(-V22, -V17, -V16, -V31, -V29, -V34, -V40, -V36, -V48, -V51, -V58, -V60, -V63, -V69,-V72, -V73, -V80, -V95, -V97, -V102, -V92, -V105, -V90, -V133,-V128, -V134, -V126, -V293, -V295, -V298, -V292, -V284, -V302, -V317, -V318, -V316)
+```
+
+```{r}
+test_temp2 %<>% select(-id_27)
+```
+
+```{r}
+missingFinal <- plot_missing(test_temp2)
+```
+
+```{r}
+missingFinal$data %>% filter(Band %in% c("Bad", "Remove"))
+```
+
+
+
+
+
+# Eğitim Verisi
+
+```{r}
+train$isFraud <- as.factor(train$isFraud)
+```
+
+
+# 2. Imbalance
+```{r}
+train %>% 
+  group_by(isFraud) %>% 
+  summarise(Count = n())%>% 
+  mutate(percent = prop.table(Count)*100)%>%
+  ggplot(aes(reorder(isFraud, -percent), percent), fill = felc)+
+  geom_col(fill = c("navyblue", "forestgreen"))+
+  geom_text(aes(label = sprintf("%.2f%%", percent)), hjust = 0.01,vjust = -0.5, size =3)+ 
+  theme_minimal()+  
+  xlab(NULL) + 
+  ylab("Fraud Percantage")+
+  ggtitle("Fraud or Non-Fraud")+
+  coord_flip()
+```
+
+# 3. TransactionDT & TransactionAmt
+
+```{r}
+ggplot()+
+  geom_histogram(train, mapping =  aes(TransactionDT, fill = "Train"))+
+  geom_histogram(test, mapping = aes(TransactionDT, fill = "Test"))+
+  scale_fill_manual(values = c("firebrick", "navy"))+
+  labs(fill = NULL, y = NULL)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(TransactionAmt, fill = isFraud), alpha = 0.6)+
+    geom_histogram()+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(log(TransactionAmt),fill = isFraud), alpha = 0.6)+
+    geom_histogram()+
+    scale_fill_ordinal()
+  
+)  
+```
+
+
+# 4. ProductCD
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(ProductCD))+
+    geom_bar(fill = "firebrick"),
+  
+  ggplot(train, aes(ProductCD, fill = isFraud))+
+    geom_bar(position = "fill")+
+    scale_fill_ordinal()+
+    coord_flip()
+)
+```
+
+# 5. Card1 - Card6
+
+*Kategorik değişkenler: Card4 ve Card6*
+
+```{r}
+grid.arrange(
+  
+  train %>% 
+    ggplot(aes(card4))+
+    geom_bar(fill = "firebrick")+
+    coord_flip()+
+    labs(x = NULL),
+  train %>% 
+    ggplot(aes(card6))+
+    geom_bar(fill = "royalblue")+
+    coord_flip()+
+    labs(x = NULL)
+)
+```
+
+```{r}
+grid.arrange(
+  
+  train %>% 
+    ggplot(aes(card4, fill = isFraud))+
+    geom_bar(position = "fill")+
+    scale_fill_ordinal()+
+    coord_flip()+
+    labs(x = NULL,
+         title = "Fraud Ratio of Card4"),
+
+  train %>% 
+    ggplot(aes(card6, fill = isFraud))+
+    geom_bar(position = "fill")+
+    scale_fill_ordinal()+
+    coord_flip()+
+    labs(x = NULL,
+         title = "Fraud Ratio of Card6")
+  
+)
+```
+
+*Sürekli Değişkenler: Card1, 2, 3, 5*
+
+```{r}
+grid.arrange(
+  ggplot(train, aes(card1, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(log(card1), fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+)
+```
+
+```{r}
+grid.arrange(
+  ggplot(train, aes(card2, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(log(card2), fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(card3, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(log(card3), fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+)
+```
+
+```{r}
+grid.arrange(
+  ggplot(train, aes(card5, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(log(card5), fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+)
+```
+
+# 6. Address
+
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(addr1, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(addr2, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+)
+```
+
+# 7. Distance
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(dist1, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(dist2, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+)
+```
+
+# 8. Email
+
+```{r}
+train %>% 
+  count(P_emaildomain) %>% 
+  ggplot(aes(reorder(P_emaildomain,n), n))+
+  geom_col(fill = "seagreen")+
+  coord_flip()
+```
+
+```{r}
+train %>% 
+  count(R_emaildomain) %>% 
+  ggplot(aes(reorder(R_emaildomain,n), n))+
+  geom_col(fill = "seagreen")+
+  coord_flip()
+```
+
+```{r}
+train %>% 
+  ggplot(aes(P_emaildomain, fill = isFraud))+
+  geom_bar(position = "fill")+
+  coord_flip()+
+  scale_fill_ordinal()
+```
+
+```{r}
+train %>% 
+  ggplot(aes(R_emaildomain, fill = isFraud))+
+  geom_bar(position = "fill")+
+  coord_flip()+
+  scale_fill_ordinal()
+```
+
+
+*Company*
+yahoo / ymail / frontier / rocketmail -> Yahoo
+
+hotmail / outlook / live / msn -> Microsoft
+
+icloud / mac / me -> Appe
+
+prodigy / att / sbcglobal-> AT&T
+
+centurylink / embarqmail / q -> Centurylink
+
+aim / aol -> AOL
+
+twc / charter -> Spectrum
+
+```{r}
+train$P_company <- NA_character_
+
+train <- train %>%  
+  mutate(P_company = 
+           if_else(P_emaildomain %in% c("yahoo.co.jp", "yahoo.co.uk"," yahoo.com",
+                                        "yahoo.com.mx", "yahoo.de", "yahoo.es", "yahoo.fr", "ymail.com",
+                                        "frontier.com", "frontiernet.net", "rocketmail.com"), "Yahoo",
+                   if_else(P_emaildomain %in% c("hotmail.co.uk", "hotmail.com", "hotmail.de", "hotmail.es",
+                                                "hotmail.fr", "live.com", "live.com.mx", "live.fr",
+                                                "msn.com","outlook.com", "outlook.es"), "Microsoft",
+                           
+                           if_else(P_emaildomain %in% c("icloud.com", "mac.com", "me.com"), "Apple",
+                                   
+                                   if_else(P_emaildomain %in% c("att.net", "prodigy.net.mx", "sbcglobal.net"),
+                                           "AT&T", 
+                                           
+                                           if_else(P_emaildomain %in% c("centurylink.net", "embarqmail.com",
+                                                                        "q.com"), "Centurylink",
+                                                   
+                                                   if_else(P_emaildomain %in% c("aim.com", "aol.com"), "AOL",
+                                                           
+                                                           if_else(P_emaildomain %in% c("charter.net","twc.com"),
+                                                                   "Spectrum", "Other"))))))))
+
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(P_company, fill = isFraud))+
+    geom_bar(position = "fill")+
+    coord_flip()+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(R_company, fill = isFraud))+
+    geom_bar(position = "fill")+
+    coord_flip()+
+    scale_fill_ordinal()
+)
+```
+
+```{r}
+# mx, es, jp, de, fr, uk
+train_temp %<>% mutate(Country = str_sub(P_emaildomain, start = str_length(P_emaildomain) - 1, end = str_length(P_emaildomain)),
+                   Country = if_else(Country == 'mx', "Mexico",
+                                     if_else(Country == 'es', "Spain",
+                                             if_else(Country == 'jp', "Japan",
+                                                     if_else(Country == 'de', "Germany",
+                                                             if_else(Country == 'fr', "France",
+                                                                     if_else(Country == 'uk', "United Kingdom", "Unknown")))))))
+```
+
+```{r}
+train_temp  %<>% mutate(P_emaildomain2 = P_emaildomain) %>% 
+    separate(P_emaildomain2, c("Dot1", "Dot2", "Dot3")) %>% 
+    mutate(Dot3 = if_else(Dot3 == "com", "com", NA_character_),
+           Dot2 = if_else(Dot2 %in% c("co","com","net"), Dot2, NA_character_)) %>% 
+    unite(Dot, Dot2, Dot3, sep = "") %>% 
+    mutate(Dot = if_else(Dot == "NANA", NA_character_, Dot),
+           Dot = str_remove_all(Dot, "NA"))
+```
+
+```{r}
+fraudMailRatio <- train_temp %>%  mutate(isFraud = if_else(isFraud == 1, "Fraud", "Non.Fraud"))  %>% group_by(P_emaildomain, isFraud) %>% count()  %>% 
+    spread(isFraud, n) %>% 
+    mutate(Fraud.Mail.Ratio = Fraud / Non.Fraud)
+
+fraudMailRatio
+```
+
+```{r}
+train_temp  %<>% left_join((fraudMailRatio %>% select(P_emaildomain,Fraud.Mail.Ratio)), by = "P_emaildomain")
+```
+
+```{r}
+# Fraud IDs
+fr <- train_temp %>% filter(isFraud == 1) %>% pull(cardnumber) %>% unique()
+
+fr_df <- train_temp %>% filter(cardnumber %in% fr)
+nonfr_df <- train_temp %>% filter(!cardnumber %in% fr)
+```
+
+```{r}
+n1 <- nonfr_df %>% group_by(cardnumber) %>% 
+    summarise(n = length(unique(P_emaildomain))) %>% arrange(-n)  %>% pull(n) %>% unique %>% sort
+n1
+```
+
+```{r}
+n2 <- fr_df %>% group_by(cardnumber) %>% 
+    summarise(n = length(unique(P_emaildomain))) %>% arrange(-n)  %>% pull(n) %>% unique %>% sort
+n2
+```
+
+```{r}
+train_temp <- train_temp %>% 
+    group_by(cardnumber, P_emaildomain) %>% 
+    mutate(UniqEmail = if_else(row_number() == 1, 1 ,0)) %>% 
+    ungroup() %>% 
+    group_by(cardnumber) %>% 
+    mutate(UniqEmail = cumsum(UniqEmail)) %>% 
+    ungroup() %>% 
+    mutate(UniqEmailProb = UniqEmail / length(unique(P_emaildomain)),
+           UniqEmailCat = if_else(UniqEmail < 20, "Not Yet", "Possible Fraud"))
+```
+
+```{r}
+train_temp %<>% select(-R_emaildomain)
+```
+
+```{r}
+write.csv(train_temp, "train_27-08-23.csv")
+```
+
+
+
+# 9. C1 - C14
+
+```{r}
+grid.arrange(
+
+  ggplot(train, aes(C1, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C2, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C3, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C4, fill = isFraud))+
+    geom_histogram()+
+    scale_fill_ordinal() 
+  
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(C5, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C6, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C7, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C8, fill = isFraud))+
+    geom_histogram()+
+    scale_fill_ordinal()
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(C9, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C10, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C11, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C12, fill = isFraud))+
+    geom_histogram()+
+    scale_fill_ordinal()
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(C13, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(C14, fill = isFraud))+
+    geom_histogram()+
+    scale_fill_ordinal()
+)
+```
+
+```{r}
+ggcorr(train %>% select(C1:C14))
+```
+
+
+# 10. D1 - D15
+
+```{r}
+head(train %>% select(D1:D15))
+```
+
+```{r}
+ggcorr(train %>% select(D1:D15))
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(train, aes(D1, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D2, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D3, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D4, fill = isFraud))+
+    geom_histogram()+
+    scale_fill_ordinal() 
+  
+)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(train, aes(D5, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D6, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D7, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D8, fill = isFraud))+
+    geom_histogram()+
+    scale_fill_ordinal() 
+  
+)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(train, aes(D9, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D10, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D11, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D12, fill = isFraud))+
+    geom_histogram()+
+    scale_fill_ordinal() 
+  
+)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(train, aes(D13, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D14, fill = isFraud))+
+    geom_histogram(show.legend = FALSE)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(D15, fill = isFraud))+
+    geom_histogram()+
+    scale_fill_ordinal() 
+  
+)
+```
+
+# 11. M1 - M9
+
+```{r}
+head(train %>% select(paste0("M", 1:9)))
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(M1, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train, aes(M2, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train, aes(M3, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train, aes(M4, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train, aes(M5, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train, aes(M6, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train, aes(M7, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train, aes(M8, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train, aes(M9, fill = isFraud))+
+    geom_bar()+
+    scale_fill_ordinal()+
+    coord_flip()
+)
+```
+
+
+# 12. ID1 - ID38
+
+```{r}
+head(train %>% select(contains("id_")), 15)
+```
+
+```{r}
+grid.arrange(
+
+  ggplot(train, aes(id_01, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(id_02, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(id_03, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(id_04, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+
+)
+```
+
+```{r}
+grid.arrange(
+
+ggplot(train, aes(id_05, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+ggplot(train, aes(id_06, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+ggplot(train, aes(id_07, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+ggplot(train, aes(id_08, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+
+)
+```
+
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(id_09, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_10, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_11, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+  
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(id_13, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(id_14, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(id_12, fill = isFraud))+
+    geom_bar(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(id_15, fill = isFraud))+
+    geom_bar(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_16, fill = isFraud))+
+    geom_bar(alpha = 0.7)+
+    scale_fill_ordinal()
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(id_17, fill = isFraud))+
+  geom_histogram(alpha = 0.7)+
+  scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_18, fill = isFraud))+
+  geom_histogram(alpha = 0.7)+
+  scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_19, fill = isFraud))+
+  geom_histogram(alpha = 0.7)+
+  scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_20, fill = isFraud))+
+  geom_histogram(alpha = 0.7)+
+  scale_fill_ordinal()
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(id_21, fill = isFraud))+
+  geom_histogram(alpha = 0.7)+
+  scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_22, fill = isFraud))+
+  geom_histogram(alpha = 0.7)+
+  scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_24, fill = isFraud))+
+  geom_histogram(alpha = 0.7)+
+  scale_fill_ordinal()
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(id_25, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+
+  ggplot(train, aes(id_26, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal(),
+  
+  ggplot(train, aes(id_32, fill = isFraud))+
+    geom_histogram(alpha = 0.7)+
+    scale_fill_ordinal()
+  
+)
+
+```
+
+```{r}
+ggplot(train %>% filter(is.na(id_23) == FALSE), aes(id_23, fill = isFraud))+
+    geom_bar(alpha = 0.7)+
+    scale_fill_ordinal()
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(id_23, fill = isFraud))+
+    geom_bar(alpha = 0.7)+
+    scale_fill_ordinal()+ coord_flip(),
+  
+  ggplot(train, aes(id_27, fill = isFraud))+
+    geom_bar(alpha = 0.7)+
+    scale_fill_ordinal()+coord_flip(),
+  
+  ggplot(train, aes(id_28, fill = isFraud))+
+  geom_bar(alpha = 0.7)+
+  scale_fill_ordinal()+coord_flip(),
+
+ggplot(train, aes(id_29, fill = isFraud))+
+  geom_bar(alpha = 0.7)+
+  scale_fill_ordinal()+coord_flip()
+)
+```
+
+
+```{r}
+ggplot(train, aes(id_30, fill = isFraud))+
+  geom_bar(alpha = 0.7)+
+  scale_fill_ordinal()+coord_flip()
+```
+
+```{r}
+ggplot(train, aes(id_31, fill = isFraud))+
+  geom_bar(alpha = 0.7)+
+  scale_fill_ordinal()+coord_flip()
+```
+
+
+
+
+# 13. DeviceType & DeviceInfo
+
+```{r}
+grid.arrange(
+  
+  ggplot(train, aes(DeviceType))+
+    geom_bar(fill = "firebrick")+
+    coord_flip(),
+  
+  ggplot(train, aes(DeviceType, fill = isFraud))+
+    geom_bar(position = "fill")+
+    scale_fill_ordinal()+
+    coord_flip()
+)
+```
+
+```{r}
+ggplot(train, aes(DeviceInfo, fill = isFraud))+
+  geom_bar(position = "fill")+
+  coord_flip()+
+  scale_fill_ordinal()
+```
+
+
+
+# Bu kısımlarda Veriyi kurcalıyoruz
+
+```{r}
+dvcinfo <- train %>%filter (!is.na(DeviceInfo)) %>%  count(DeviceInfo, name = "All") %>% arrange(-All) 
+dvcinfofr <- train %>% filter(isFraud == 1) %>%  count(DeviceInfo) %>% arrange(-n) %>% filter(!is.na(DeviceInfo))
+dvcRatio <- inner_join(dvcinfofr, dvcinfo, by ="DeviceInfo") %>% mutate(prop = n/ All)
+```
+
+```{r}
+# Fraud IDs
+fr <- train %>% filter(isFraud == 1) %>% pull(cardnumber) %>% unique()
+
+fr_df <- train %>% filter(cardnumber %in% fr)
+nonfr_df <- train %>% filter(!cardnumber %in% fr)
+```
+
+```{r}
+train %>% mutate(Status = if_else(cardnumber %in% fr, "Real Fraud", "Non Fraud")) %>% 
+  group_by(Status) %>% 
+  summarise(Count = n())%>% 
+  mutate(percent = prop.table(Count)*100)%>%
+  ggplot(aes(reorder(Status, -percent), percent), fill = felc)+
+  geom_col(fill = c("navyblue", "forestgreen"))+
+  geom_text(aes(label = sprintf("%.2f%%", percent)), hjust = 0.01,vjust = -0.5, size =3)+ 
+  theme_minimal()+  
+  xlab(NULL) + 
+  ylab("Fraud Percantage")+
+  ggtitle("Fraud or Non-Fraud")+
+  coord_flip()
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% count(DeviceInfo) %>% head()
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% head
+```
+
+```{r}
+train %>% filter(cardnumber %in% "10004_529_150_162") %>% pull(DeviceInfo) %>% unique()
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using) %>% 
+  summarise(mean = mean(Uniq.Device.Using),
+            sd = sd(Uniq.Device.Using),
+            max = max(Uniq.Device.Using),
+            min = min(Uniq.Device.Using),
+            SecondObs = nth(Uniq.Device.Using, 2),
+            Dif = max - SecondObs)
+```
+
+```{r}
+nonfr_df %>% group_by(cardnumber) %>% summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using) %>% 
+  summarise(mean = mean(Uniq.Device.Using),
+            sd = sd(Uniq.Device.Using),
+            max = max(Uniq.Device.Using),
+            min = min(Uniq.Device.Using),
+            SecondObs = nth(Uniq.Device.Using, 2),
+            Dif = max - SecondObs)
+```
+
+```{r}
+bind_rows(
+  
+  fr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo)))%>% 
+    ungroup() %>% mutate(Status = "Real Fraud"),
+  
+  nonfr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = as.numeric(length(unique(DeviceInfo)))) %>% 
+    ungroup() %>% mutate(Status = "Non Fraud")
+  
+  ) %>% 
+  
+  ggplot()+
+  geom_density(aes(Uniq.Device.Using,  fill = Status),alpha = 0.5,adjust = 4)+
+  theme_minimal()+
+  xlim(0,30)
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using) %>% head()
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using)  %>% pull(Uniq.Device.Using) %>% unique %>% sort
+```
+
+```{r}
+nonfr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using) %>% head()
+```
+
+```{r}
+nonfr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using)  %>% pull(Uniq.Device.Using) %>% unique %>% sort
+```
+
+```{r}
+test %>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_")) %>% filter(cardnumber %in% "11837_304_146_226") %>% head
+```
+
+```{r}
+test %>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_")) %>% filter(cardnumber %in% "11837_304_146_226") %>% dim
+```
+
+```{r}
+test %>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_")) %>% filter(cardnumber %in% "11837_304_146_226") %>% 
+  filter(!DeviceInfo %in% (train %>% filter(cardnumber %in% "11837_304_146_226") %>% pull(DeviceInfo) %>% unique())) %>% pull(DeviceInfo) %>% unique()
+```
+
+```{r}
+train %>% filter(cardnumber %in% "11837_304_146_226") %>% select(isFraud) %>% distinct()
+```
+
+```{r}
+test %>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_")) %>% filter(cardnumber %in% "11837_304_146_226") %>% 
+  filter(!DeviceInfo %in% (train %>% filter(cardnumber %in% "11837_304_146_226") %>% pull(DeviceInfo) %>% unique())) %>% pull(DeviceInfo) %>% unique() %>% length
+```
+
+```{r}
+train_temp <- train %>% group_by(cardnumber, DeviceInfo) %>% 
+    mutate(UniqDevice = if_else(row_number() == 1, 1 ,0)) %>% 
+    ungroup() %>% 
+    mutate(UniqDevice2 = cumsum(UniqDevice),
+           Uniq.Device.Cat = if_else(UniqDevice2 < 18, "Not Yet", "Possible Fraud"),
+           DeviceProb = UniqDevice2 / length(unique(DeviceInfo)))
+```
+
+```{r}
+head(train_temp  %>% select(UniqDevice,UniqDevice2, Uniq.Device.Cat, DeviceProb))
+```
+
+```{r}
+# Android Eşleşmesi
+
+androidv <-data.frame(
+  
+  id_30 = as.character(c("Android 4.4.2", "Android 5.0",   "Android 5.0.2", "Android 5.1.1", "Android 6.0",   "Android 6.0.1", 
+                         "Android 7.0", "Android 7.1.1", "Android 7.1.2", "Android 8.0.0", "Android 8.1.0","Android 9")),
+  
+  ReleaseDate = as.character(c(2013, rep(2014, 3), rep(2015, 2), rep(2016, 3), rep(2017, 2), 2018))
+)
+androidv$ReleaseDate <- as.character(androidv$ReleaseDate)
+androidv$id_30 <- as.character(androidv$id_30)
+
+
+# Windows
+
+# win_url <- "https://www.wikizeroo.org/index.php?q=aHR0cHM6Ly9lbi53aWtpcGVkaWEub3JnL3dpa2kvTGlzdF9vZl9NaWNyb3NvZnRfV2luZG93c192ZXJzaW9ucw"
+# win_html <- read_html(win_url)
+# windows <- (win_html %>% html_nodes("table"))[[1]] %>% html_table(fill = T)
+
+
+windows <- read.csv("../input/windows/windows.csv")[-1]
+
+windows2 <- windows[, c(1,3)] %>% mutate(Windows.version = as.character(Windows.version),
+                                         Windows.version= if_else(Windows.version == "Windows 1.0", "Windows", Windows.version),
+                                         Release.date = as.character(Release.date)) %>% 
+    rename(id_30 =  Windows.version,
+           ReleaseDate = Release.date) %>% mutate(id_30 = as.character(id_30))
+
+windows2 <- windows2 %>% mutate(ReleaseDate = str_sub(ReleaseDate, start = -4, end= -1))
+```
+
+```{r}
+# iOS
+
+iOS <- data.frame(
+  
+  id_30 = as.character(c(
+    "iOS 9.3.5", "iOS 10.0.2", "iOS 10.1.1", "iOS 10.2.0", "iOS 10.2.1", paste0("iOS 10.3.", 0:9),
+    paste0("iOS 11.0.", 0:9), paste0("iOS 11.1.", 0:9), paste0("iOS 11.2.", 0:9), "iOS 11.3.0", "iOS 11.3.1 ", "iOS 11.4.0", "iOS 11.4.1 ",
+    "iOS 12.0.0", "iOS 12.0.1", "iOS 12.1.0", "iOS 12.1.1", "iOS 12.1.2")),
+  
+  ReleaseDate = as.character(c(2016, 2016,  2016, 2017, 2017, rep(2017,40), rep(2018,9)))
+)
+
+iOS$id_30 <- as.character(iOS$id_30)
+iOS$ReleaseDate <- as.character(iOS$ReleaseDate)
+
+
+
+# Mac OS X
+
+# mac_url <- "https://www.wikizeroo.org/index.php?q=aHR0cHM6Ly90ci53aWtpcGVkaWEub3JnL3dpa2kvTWFjT1M"
+# mac_html <- read_html(mac_url)
+
+# mac <- (mac_html %>% html_nodes("table"))[[2]] %>% html_table(fill = T)
+
+# mac <- mac[-1:-4,c(1,3)] %>% 
+#  mutate(Sürüm = if_else(row_number() %in% 9:12, paste0("Mac ", Sürüm), Sürüm),
+#         Sürüm = if_else(row_number() %in% 13:16, paste0("Mac OS X ", str_sub(Sürüm, start = 7)), Sürüm)) %>% 
+#  rename(id_30 = Sürüm, ReleaseDate = `Tanıtım Tarihi`) %>% 
+#  mutate(ReleaseDate = str_sub(ReleaseDate, start = -4, end = -1))
+
+# mac <- mac %>% rename(id_30_2 = id_30)
+
+# mm <- c(paste0("Mac OS X 10.", 0:9, "."), paste0("Mac OS X 10_", 0:9, "_"))
+# mac2 <- train_temp %>% select(id_30) %>% mutate(id_30_2 = str_sub(id_30, start = 1 , end = 14),
+#                                          id_30_2 = if_else(id_30_2 %in% mm,
+#                                                         str_sub(id_30_2, end = 13), id_30_2),
+#                                          id_30_2 = str_replace_all(id_30_2 , "_", ".")) %>% left_join(mac, by = "id_30_2") %>% 
+#   na.omit() %>% distinct() %>% select(-id_30_2)
+
+mac2 <- read.csv("../input/macosx2/mac2.csv")[-1]
+mac2$id_30 <- as.character(mac2$id_30)
+mac2$ReleaseDate <- as.character(mac2$ReleaseDate)
+```
+
+```{r}
+versions <-  bind_rows(androidv, windows2, iOS, mac2)
+train_temp2 <- left_join(train_temp, versions, by = "id_30") 
+
+train_temp2$id_30 <- str_replace_all(train_temp2$id_30, "_", ".")
+
+train_temp2$ReleaseDate  <- as.numeric(train_temp2$ReleaseDate)
+```
+
+```{r}
+train_temp2 <- train_temp2  %>% mutate(TrVersion = year - ReleaseDate)
+```
+
+```{r}
+ggplot(train_temp2, aes(TrVersion, fill = as.factor(isFraud)))+
+    geom_histogram()+
+    scale_fill_ordinal()
+```
+
+```{r}
+a <- train_temp2  %>% group_by(isFraud, id_30) %>% count(TrVersion)
+head(a)
+```
+
+```{r}
+train_temp2  %>% group_by(isFraud) %>% count(TrVersion)
+```
+
+```{r}
+# Fraud IDs
+fr2 <- train_temp2 %>% filter(isFraud == 1) %>% pull(cardnumber) %>% unique()
+
+fr_df2 <- train_temp2 %>% filter(cardnumber %in% fr2)
+nonfr_df2 <- train_temp2 %>% filter(!cardnumber %in% fr2)
+```
+
+```{r}
+fr_df2  %>%   summarise(mean = mean(TrVersion, na.rm = TRUE),
+            sd = sd(TrVersion, na.rm = TRUE),
+            max = max(TrVersion, na.rm = TRUE),
+            min = min(TrVersion, na.rm = TRUE))
+```
+
+```{r}
+nonfr_df2  %>%   summarise(mean = mean(TrVersion, na.rm = TRUE),
+            sd = sd(TrVersion, na.rm = TRUE),
+            max = max(TrVersion, na.rm = TRUE),
+            min = min(TrVersion, na.rm = TRUE))
+```
+
+```{r}
+a <- fr_df2  %>% group_by(id_30, ReleaseDate) %>% count(TrVersion) %>% arrange(id_30, TrVersion)
+a
+```
+
+```{r}
+a  %>% filter(id_30 %in% c('Windows', 'Windows 10', 'Windows 7', 'Windows 8' ,'Windows 8.1', 'Windows Vista' ,'Windows XP')) %>% arrange(-TrVersion)
+```
+
+```{r}
+a  %>% filter(id_30 %in% c('Android' ,'Android 4.4.2' ,'Android 5.0' ,'Android 5.0.2' ,'Android 5.1.1' ,'Android 6.0', 'Android 6.0.1' ,'Android 7.0' ,'Android 7.1.1', 'Android 7.1.2' ,'Android 8.0.0' ,'Android 8.1.0')) %>% arrange(-TrVersion)
+```
+
+```{r}
+a  %>% filter(id_30 %in% c('iOS', 'iOS 10.0.2', 'iOS 10.1.1', 'iOS 10.2.0' ,'iOS 10.2.1' ,'iOS 10.3.1', 'iOS 10.3.2','iOS 10.3.3' ,'iOS 11.0.0', 'iOS 11.0.1', 'iOS 11.0.2' ,'iOS 11.0.3', 'iOS 11.1.0', 'iOS 11.1.1', 'iOS 11.1.2', 'iOS 11.2.0', 'iOS 11.2.1', 'iOS 11.2.2', 'iOS 11.2.5', 'iOS 11.2.6', 'iOS 11.3.0', 'iOS 11.3.1', 'iOS 11.4.0' ,'iOS 11.4.1', 'iOS 9.3.5')) %>% arrange(-TrVersion)
+```
+
+```{r}
+a  %>% filter(id_30 %in% c('Mac', 'Mac OS X 10.10', 'Mac OS X 10.10.5' ,'Mac OS X 10.11' ,'Mac OS X 10.11.3', 'Mac OS X 10.11.4', 'Mac OS X 10.11.5', 'Mac OS X 10.11.6' ,'Mac OS X 10.12' ,'Mac OS X 10.12.1', 'Mac OS X 10.12.2' ,'Mac OS X 10.12.3', 'Mac OS X 10.12.4', 'Mac OS X 10.12.5' ,'Mac OS X 10.12.6', 'Mac OS X 10.13', 'Mac OS X 10.13.1', 'Mac OS X 10.13.2', 'Mac OS X 10.13.3' ,'Mac OS X 10.13.4', 'Mac OS X 10.13.5', 'Mac OS X 10.6', 'Mac OS X 10.6.8', 'Mac OS X 10.7.5' ,'Mac OS X 10.8.5', 'Mac OS X 10.9', 'Mac OS X 10.9.5')) %>% arrange(-TrVersion)
+```
+
+```{r}
+train_temp2 <- train_temp2  %>% mutate(OpSystem = if_else(str_sub(id_30, start = 1, end = 3) %in% "Mac", "Mac",
+                                                           if_else(is.na(id_30), "other",
+                                                                  if_else(str_sub(id_30, start = 1, end = 7) %in% "Windows", "Windows",
+                                                                         if_else(str_sub(id_30, start = 1, end = 7) %in% "Android", "Android",
+                                                                                 if_else(str_sub(id_30, start = 1, end = 3) %in% "iOS", "iOS",
+                                                                                         if_else(id_30 %in% "Linux", "Linux",
+                                                                                                 if_else(id_30 %in% "func", "other", "other")
+                                                                                        )))))))
+```
+
+```{r}
+a <- train_temp2 %>%  filter(!is.na(id_31)) %>% separate(id_31, c("Browser", "x")) %>%  select(Browser, x)
+```
+
+```{r}
+a <- train_temp2 %>%  mutate(id_31 = id_31_2, id_31_2 = if_else(is.na(id_31_2), "other", id_31_2)) %>% separate(id_31_2, c("Browser", "x"))
+```
+
+```{r}
+# Günlük transaction sayısı
+train_temp2 %<>% mutate(TransactionFreqDaily = 1) %>%  
+  group_by(date, cardnumber) %>% 
+  mutate(TransactionFreqDaily = cumsum(TransactionFreqDaily))
+
+# günlük saatlik transaction sayısı 
+train_temp2  %<>% mutate(TransactionFreqHour = 1) %>%  
+  group_by(date, hour, cardnumber) %>% 
+  mutate(TransactionFreqHour = cumsum(TransactionFreqHour)) 
+
+# Hangi saat diliminde transaction saısı
+train_temp2 %<>% mutate(TransactionFreqAMPM = 1) %>%  
+  group_by(date, am_pm, cardnumber) %>% 
+  mutate(TransactionFreqAMPM = cumsum(TransactionFreqAMPM)) 
+
+# Aylık transaction sayısı
+train_temp2 %<>% mutate(TransactionFreqMonthly = 1) %>%  
+  group_by(year, month, cardnumber) %>% 
+  mutate(TransactionFreqMonthly = cumsum(TransactionFreqMonthly))
+
+write.csv(train_temp2, "train.csv")
+```
+
+
+# Veriyi kurcalama işlemi şimdilik bitti, Farklı yaklaşımlarla kurcalamaya devam edildi
+
+```{r}
+train <- vroom("../train_27-08-23.csv", delim = ",")
+test <- vroom("../test.csv", delim = ",")
+
+train$isFraud <- as.factor(train$isFraud)
+```
+
+```{r}
+missingTrain2$data %<>% mutate(index = row_number())
+missingD <- missingTrain2$data %>% filter(index >= 21, index <= 35, pct_missing > 0.59) %>% pull(index)
+
+train <- train[,-missingD]
+
+rm(missingD)
+```
+
+```{r}
+corD2 <- ggcorr(train %>% select(D1:D15), method = "p", label = T, label_round =2)
+corD2
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train %>% filter(!is.na(M1)), aes(M1, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train %>% filter(!is.na(M2)), aes(M2, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train %>% filter(!is.na(M3)), aes(M3, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip()
+  
+)
+```
+
+```{r}
+grid.arrange(
+  
+  ggplot(train %>% filter(!is.na(M4)), aes(M4, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train %>% filter(!is.na(M5)), aes(M5, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train %>% filter(!is.na(M6)), aes(M6, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip()
+)
+```
+
+```{r}
+grid.arrange(
+  ggplot(train %>% filter(!is.na(M7)), aes(M7, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train %>% filter(!is.na(M8)), aes(M8, fill = isFraud))+
+    geom_bar(show.legend = FALSE)+
+    scale_fill_ordinal()+
+    coord_flip(),
+  
+  ggplot(train %>% filter(!is.na(M9)), aes(M9, fill = isFraud))+
+    geom_bar()+
+    scale_fill_ordinal()+
+    coord_flip()
+)
+```
+
+```{r}
+train %<>% select(-M1, -M7, -M8, -M9)
+```
+
+```{r}
+missingTrain3 <- plot_missing(train) 
+
+missingTrain3$data %<>% mutate(index = row_number())
+```
+
+```{r}
+rmFeature <- missingTrain3$data %>% filter(feature %in% paste0("V", 1:339), pct_missing > 0.59) %>% pull(feature)
+```
+
+```{r}
+missingV <- missingTrain3$data %>% filter(index >= 34, index <= 372, pct_missing > 0.59) %>% pull(index)
+
+train <- train[,-missingV]
+
+rm(missingV)
+```
+
+```{r}
+train %<>% select(-V1:-V11)
+```
+
+```{r}
+corV <- ggcorr(train %>% select(V12:V50), method = "p", label = T, label_round =2)
+corV
+```
+
+```{r}
+# Gruplara göre parametreler oluşturma.
+train2 <- train %>% 
+  
+  mutate(
+    
+    #Grup 1
+    Vsum_g1 = apply(train %>% select(V126:V134), 1, function(x){sum(x, na.rm = TRUE)}),
+    Vsd_g1 = apply(train %>% select(V126:V134), 1,  function(x){sd(x, na.rm = TRUE)}),
+    Vmean_g1 = apply(train %>% select(V126:V134), 1,  function(x){mean(x, na.rm = TRUE)}),
+    Vkurtosis_g1 = apply(train %>% select(V126:V134), 1,  function(x){kurtosis(x, na.rm = TRUE)}),
+    Vskewnes_g1 = apply(train %>% select(V126:V134), 1,  function(x){skewness(x, na.rm = TRUE)}),
+    Vkurtosis_g1 = if_else(is.na(Vkurtosis_g1) == TRUE, 0, Vkurtosis_g1),
+    Vskewnes_g1 = if_else(is.na(Vskewnes_g1) == TRUE, 0, Vskewnes_g1),
+    
+    #Grup 2
+    Vsum_g2 = apply(train %>% select(V306:V321), 1, function(x){sum(x, na.rm = TRUE)}),
+    Vsd_g2 = apply(train %>% select(V306:V321), 1,  function(x){sd(x, na.rm = TRUE)}),
+    Vmean_g2 = apply(train %>% select(V306:V321), 1,  function(x){mean(x, na.rm = TRUE)}),
+    Vkurtosis_g2 = apply(train %>% select(V306:V321), 1,  function(x){kurtosis(x, na.rm = TRUE)}),
+    Vskewnes_g2 = apply(train %>% select(V306:V321), 1,  function(x){skewness(x, na.rm = TRUE)}),
+    Vkurtosis_g2 = if_else(is.na(Vkurtosis_g2) == TRUE, 0, Vkurtosis_g2),
+    Vskewnes_g2 = if_else(is.na(Vskewnes_g2) == TRUE, 0, Vskewnes_g2)
+           
+         )
+```
+
+```{r}
+train2 %<>% select(-id_27)
+train2  %<>% distinct()
+write.csv(train2, "train_2019_08_27.csv")
+```
+
+```{r}
+train <- vroom("../train_2019_08_27.csv", delim = ",")
+test <- vroom("../test.csv", delim = ",")
+```
+
+```{r}
+dvcinfo <- train %>%filter (!is.na(DeviceInfo)) %>%  count(DeviceInfo, name = "All") %>% arrange(-All) 
+dvcinfofr <- train %>% filter(isFraud == 1) %>%  count(DeviceInfo) %>% arrange(-n) %>% filter(!is.na(DeviceInfo))
+dvcRatio <- inner_join(dvcinfofr, dvcinfo, by ="DeviceInfo") %>% mutate(prop = n/ All)
+```
+
+```{r}
+# Fraud IDs
+fr <- train %>% filter(isFraud == 1) %>% pull(cardnumber) %>% unique()
+
+fr_df <- train %>% filter(cardnumber %in% fr)
+nonfr_df <- train %>% filter(!cardnumber %in% fr)
+```
+
+```{r}
+train %>% mutate(Status = if_else(cardnumber %in% fr, "Real Fraud", "Non Fraud")) %>% 
+  group_by(Status) %>% 
+  summarise(Count = n())%>% 
+  mutate(percent = prop.table(Count)*100)%>%
+  ggplot(aes(reorder(Status, -percent), percent), fill = felc)+
+  geom_col(fill = c("navyblue", "forestgreen"))+
+  geom_text(aes(label = sprintf("%.2f%%", percent)), hjust = 0.01,vjust = -0.5, size =3)+ 
+  theme_minimal()+  
+  xlab(NULL) + 
+  ylab("Fraud Percantage")+
+  ggtitle("Fraud or Non-Fraud")+
+  coord_flip()
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% count(DeviceInfo) %>% head()
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% head
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using) %>% 
+  summarise(mean = mean(Uniq.Device.Using),
+            sd = sd(Uniq.Device.Using),
+            max = max(Uniq.Device.Using),
+            min = min(Uniq.Device.Using),
+            SecondObs = nth(Uniq.Device.Using, 2),
+            Dif = max - SecondObs)
+```
+
+```{r}
+nonfr_df %>% group_by(cardnumber) %>% summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using) %>% 
+  summarise(mean = mean(Uniq.Device.Using),
+            sd = sd(Uniq.Device.Using),
+            max = max(Uniq.Device.Using),
+            min = min(Uniq.Device.Using),
+            SecondObs = nth(Uniq.Device.Using, 2),
+            Dif = max - SecondObs)
+```
+
+```{r}
+bind_rows(
+  
+  fr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo)))%>% 
+    ungroup() %>% mutate(Status = "Real Fraud"),
+  
+  nonfr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = as.numeric(length(unique(DeviceInfo)))) %>% 
+    ungroup() %>% mutate(Status = "Non Fraud")
+  
+  ) %>% 
+  
+  ggplot()+
+  geom_density(aes(Uniq.Device.Using, fill = Status),alpha = 0.5, adjust = 4)+
+  theme_minimal()+
+  xlim(0,20)
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using) %>% head()
+```
+
+```{r}
+fr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using)  %>% pull(Uniq.Device.Using) %>% unique %>% sort
+```
+
+```{r}
+nonfr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using) %>% head()
+```
+
+```{r}
+nonfr_df %>% group_by(cardnumber) %>% 
+    summarise(Uniq.Device.Using = length(unique(DeviceInfo))) %>% arrange(-Uniq.Device.Using)  %>% pull(Uniq.Device.Using) %>% unique %>% sort
+```
+
+```{r}
+test %>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_")) %>% filter(cardnumber %in% "11837_304_146_226") %>% head
+```
+
+```{r}
+test %>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_")) %>% filter(cardnumber %in% "11837_304_146_226") %>% dim
+```
+
+```{r}
+test %>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_")) %>% filter(cardnumber %in% "11837_304_146_226") %>% head
+```
+
+```{r}
+train %<>% group_by(cardnumber, DeviceInfo) %>% 
+    mutate(UniqDevice = if_else(row_number() == 1, 1 ,0)) %>% 
+    ungroup() %>% 
+    group_by(cardnumber) %>% 
+    mutate(UniqDevice = cumsum(UniqDevice)) %>% 
+    ungroup() %>% 
+    mutate(Uniq.Device.Cat = if_else(UniqDevice < 18, "Not Yet", "Possible Fraud"),
+           DeviceProb = UniqDevice / length(unique(DeviceInfo)))
+```
+
+```{r}
+# Android Eşleşmesi
+
+androidv <-data.frame(
+  
+  id_30 = as.character(c("Android 4.4.2", "Android 5.0",   "Android 5.0.2", "Android 5.1.1", "Android 6.0",   "Android 6.0.1", 
+                         "Android 7.0", "Android 7.1.1", "Android 7.1.2", "Android 8.0.0", "Android 8.1.0","Android 9")),
+  
+  ReleaseDate = as.character(c(2013, rep(2014, 3), rep(2015, 2), rep(2016, 3), rep(2017, 2), 2018))
+)
+androidv$ReleaseDate <- as.character(androidv$ReleaseDate)
+androidv$id_30 <- as.character(androidv$id_30)
+
+
+# Windows
+
+# win_url <- "https://www.wikizeroo.org/index.php?q=aHR0cHM6Ly9lbi53aWtpcGVkaWEub3JnL3dpa2kvTGlzdF9vZl9NaWNyb3NvZnRfV2luZG93c192ZXJzaW9ucw"
+# win_html <- read_html(win_url)
+# windows <- (win_html %>% html_nodes("table"))[[1]] %>% html_table(fill = T)
+
+
+windows <- read.csv("../input/windows/windows.csv")[-1]
+
+windows2 <- windows[, c(1,3)] %>% mutate(Windows.version = as.character(Windows.version),
+                                         Windows.version= if_else(Windows.version == "Windows 1.0", "Windows", Windows.version),
+                                         Release.date = as.character(Release.date)) %>% 
+    rename(id_30 =  Windows.version,
+           ReleaseDate = Release.date) %>% mutate(id_30 = as.character(id_30))
+
+windows2 <- windows2 %>% mutate(ReleaseDate = str_sub(ReleaseDate, start = -4, end= -1)) %>% select(id_30, ReleaseDate)
+```
+
+```{r}
+# iOS
+
+iOS <- data.frame(
+  
+  id_30 = as.character(c(
+    "iOS 9.3.5", "iOS 10.0.2", "iOS 10.1.1", "iOS 10.2.0", "iOS 10.2.1", paste0("iOS 10.3.", 0:9),
+    paste0("iOS 11.0.", 0:9), paste0("iOS 11.1.", 0:9), paste0("iOS 11.2.", 0:9), "iOS 11.3.0", "iOS 11.3.1 ", "iOS 11.4.0", "iOS 11.4.1 ",
+    "iOS 12.0.0", "iOS 12.0.1", "iOS 12.1.0", "iOS 12.1.1", "iOS 12.1.2")),
+  
+  ReleaseDate = as.character(c(2016, 2016,  2016, 2017, 2017, rep(2017,40), rep(2018,9)))
+)
+
+iOS$id_30 <- as.character(iOS$id_30)
+iOS$ReleaseDate <- as.character(iOS$ReleaseDate)
+
+
+
+# Mac OS X
+
+# mac_url <- "https://www.wikizeroo.org/index.php?q=aHR0cHM6Ly90ci53aWtpcGVkaWEub3JnL3dpa2kvTWFjT1M"
+# mac_html <- read_html(mac_url)
+
+# mac <- (mac_html %>% html_nodes("table"))[[2]] %>% html_table(fill = T)
+
+# mac <- mac[-1:-4,c(1,3)] %>% 
+#  mutate(Sürüm = if_else(row_number() %in% 9:12, paste0("Mac ", Sürüm), Sürüm),
+#         Sürüm = if_else(row_number() %in% 13:16, paste0("Mac OS X ", str_sub(Sürüm, start = 7)), Sürüm)) %>% 
+#  rename(id_30 = Sürüm, ReleaseDate = `Tanıtım Tarihi`) %>% 
+#  mutate(ReleaseDate = str_sub(ReleaseDate, start = -4, end = -1))
+
+# mac <- mac %>% rename(id_30_2 = id_30)
+
+# mm <- c(paste0("Mac OS X 10.", 0:9, "."), paste0("Mac OS X 10_", 0:9, "_"))
+# mac2 <- train %>% select(id_30) %>% mutate(id_30_2 = str_sub(id_30, start = 1 , end = 14),
+#                                          id_30_2 = if_else(id_30_2 %in% mm,
+#                                                         str_sub(id_30_2, end = 13), id_30_2),
+#                                          id_30_2 = str_replace_all(id_30_2 , "_", ".")) %>% left_join(mac, by = "id_30_2") %>% 
+#   na.omit() %>% distinct() %>% select(-id_30_2)
+
+mac2 <- read.csv("../input/macosx2/mac2.csv")[-1]
+mac2$id_30 <- as.character(mac2$id_30)
+mac2$ReleaseDate <- as.character(mac2$ReleaseDate)
+```
+
+```{r}
+versions <-  bind_rows(androidv, windows2, iOS, mac2)
+```
+
+```{r}
+train <- dplyr::left_join(train, versions, by = "id_30")
+
+train$ReleaseDate  <- as.numeric(train$ReleaseDate)
+
+train$id_30 <- str_replace_all(train$id_30, "_", ".")
+```
+
+```{r}
+train <- train %>% mutate(TrVersion = year - ReleaseDate)
+```
+
+```{r}
+ggplot(train, aes(TrVersion, fill = as.factor(isFraud)))+
+    geom_histogram()+
+    scale_fill_ordinal()
+```
+
+```{r}
+# Fraud IDs
+fr2 <- train %>% filter(isFraud == 1) %>% pull(cardnumber) %>% unique()
+
+fr_df2 <- train %>% filter(cardnumber %in% fr2)
+nonfr_df2 <- train %>% filter(!cardnumber %in% fr2)
+```
+
+```{r}
+fr_df2  %>% count(TrVersion)
+```
+
+```{r}
+fr_df2  %>%   summarise(mean = mean(TrVersion, na.rm = TRUE),
+            sd = sd(TrVersion, na.rm = TRUE),
+            max = max(TrVersion, na.rm = TRUE),
+            min = min(TrVersion, na.rm = TRUE))
+```
+
+```{r}
+fr_df2  %>% group_by(id_30, ReleaseDate) %>% 
+    count(TrVersion) %>% arrange(id_30, TrVersion)  %>% 
+    filter(id_30 %in% c('Windows', 'Windows 10', 'Windows 7', 'Windows 8' ,'Windows 8.1', 'Windows Vista' ,'Windows XP')) %>% 
+    arrange(-TrVersion)
+```
+
+```{r}
+train <- train  %>% 
+    mutate(OpSystem = if_else(
+        str_sub(id_30, start = 1, end = 3) %in% "Mac", "Mac",
+        if_else(is.na(id_30), "other",
+                if_else(str_sub(id_30, start = 1, end = 7) %in% "Windows", "Windows",
+                        if_else(str_sub(id_30, start = 1, end = 7) %in% "Android", "Android",
+                                if_else(str_sub(id_30, start = 1, end = 3) %in% "iOS", "iOS",
+                                        if_else(id_30 %in% "Linux", "Linux",
+                                                if_else(id_30 %in% "func", "other", "other")
+                                               )))))))
+```
+
+```{r}
+# Günlük transaction sayısı
+train %<>% mutate(TransactionFreqDaily = 1) %>%  
+  group_by(date, cardnumber) %>% 
+  mutate(TransactionFreqDaily = cumsum(TransactionFreqDaily))
+
+# günlük saatlik transaction sayısı 
+train  %<>% mutate(TransactionFreqHour = 1) %>%  
+  group_by(date, hour, cardnumber) %>% 
+  mutate(TransactionFreqHour = cumsum(TransactionFreqHour)) 
+
+# Hangi saat diliminde transaction saısı
+train %<>% mutate(TransactionFreqAMPM = 1) %>%  
+  group_by(date, am_pm, cardnumber) %>% 
+  mutate(TransactionFreqAMPM = cumsum(TransactionFreqAMPM)) 
+
+# Aylık transaction sayısı
+train %<>% mutate(TransactionFreqMonthly = 1) %>%  
+  group_by(year, month, cardnumber) %>% 
+  mutate(TransactionFreqMonthly = cumsum(TransactionFreqMonthly))
+```
+
+```{r}
+train  %<>% mutate(ZipCountry = paste0(addr1, addr2)) %>% 
+    group_by(cardnumber, ZipCountry) %>% 
+    mutate(UniqCountry = if_else(row_number() == 1, 1 ,0)) %>% 
+    ungroup() %>% 
+    group_by(cardnumber) %>% 
+    mutate(UniqCountry = cumsum(UniqCountry)) %>% 
+    ungroup() %>% 
+    mutate(CountryProb = UniqCountry / length(unique(ZipCountry)),
+           UniqCountryCat = if_else(UniqCountry < 31, "Not Yet", "Possible Fraud"))
+```
+
+```{r}
+fr3 <- train %>% filter(isFraud == 1) %>% pull(cardnumber) %>% unique()
+
+fr_df3 <- train %>% filter(cardnumber %in% fr3)
+nonfr_df3 <- train %>% filter(!cardnumber %in% fr3)
+
+l1 <- fr_df3 %>% group_by(cardnumber) %>% 
+    summarise(l = length(unique(ZipCountry))) %>% arrange(-l)  %>% pull(l) %>% unique %>% sort
+l1
+```
+
+```{r}
+l2 <- nonfr_df3 %>% group_by(cardnumber) %>% 
+    summarise(l = length(unique(ZipCountry))) %>% arrange(-l)  %>% pull(l) %>% unique %>% sort
+l2
+```
+
+```{r}
+train %>% count(ZipCountry) %>% arrange(-n) %>% head(20) %>% 
+  ggplot(aes(reorder(ZipCountry, n), n))+
+  geom_col(fill = "seagreen")+
+  coord_flip()+
+  labs(y = "Frequency",
+       x = NULL,
+       title = "Zipcode & Country = Unique Address")+
+  theme_minimal()
+```
+
+```{r}
+write.csv(train, "train.csv")
+```
+
+```{r}
+train <- vroom("../train.csv", delim = ",")
+test <- vroom("../test.csv", delim = ",")
+```
+
+```{r}
+# Fraud IDs
+fr <- train %>% filter(isFraud == 1) %>% pull(cardnumber) %>% unique()
+
+fr_df <- train %>% filter(cardnumber %in% fr)
+nonfr_df <- train %>% filter(!cardnumber %in% fr)
+
+frl <- fr_df %>% select(year,month, isFraud, cardnumber, TransactionAmt) %>%  
+  group_by(year,month, cardnumber) %>% 
+  summarise(Spend.Sum = sum(TransactionAmt),
+            Spend.Mean = mean(TransactionAmt)) %>% 
+  ungroup() %>% 
+  mutate(Limit = Spend.Sum + Spend.Mean)
+
+head(frl)
+```
+
+```{r}
+nfrl <- nonfr_df %>% select(year,month, isFraud, cardnumber, TransactionAmt) %>%  
+  group_by(year,month, cardnumber) %>% 
+  summarise(Spend.Sum = sum(TransactionAmt),
+            Spend.Mean = mean(TransactionAmt)) %>% 
+  ungroup() %>% 
+  mutate(Limit = Spend.Sum + Spend.Mean)
+
+head(nfrl)
+```
+
+```{r}
+summary(frl$Spend.Sum) # Real Fraud
+summary(nfrl$Spend.Sum) # Real Non-Fraud
+```
+
+```{r}
+limit <- train %>% select(year,month, isFraud, cardnumber, TransactionAmt, card6, card4)
+
+limit2 <- limit %>%  group_by(year,month, cardnumber, card6, card4) %>% 
+                     summarise(Spend = sum(TransactionAmt))
+
+head(limit2)
+```
+
+```{r}
+limit_max <- limit2 %>%
+    group_by(cardnumber) %>% 
+    summarise(max_spend = max(Spend)) 
+
+head(limit_max)
+```
+
+```{r}
+cardlimit <- limit_max %>% mutate(Limit = if_else(max_spend < 500, 500, 
+                                           if_else(max_spend < 1200, 1500,
+                                                   if_else(max_spend < 2200, 3500,
+                                                           if_else(max_spend < 4500, 5000,
+                                                                   if_else(max_spend < 7000, 9000, 
+                                                                           if_else(max_spend < 10000, 14000,
+                                                                                   if_else(max_spend < 15000, 20000,
+                                                                                           if_else(max_spend < 20000, 30000,
+                                                                                                   if_else(max_spend < 30000, 40000,
+                                                                                                           if_else(max_spend < 50000,60000,
+                                                                                                                   if_else(max_spend < 90000, 120000,
+                                                                                                                           if_else(max_spend < 140000, 180000,
+                                                                                                                                   if_else(max_spend < 200000, 250000,
+                                                                                                                                           if_else(max_spend < 260000, 300000,
+                                                                                                                                                   if_else(max_spend < 320000, 360000,
+                                                                                                                                                           if_else(max_spend < 390000, 450000, 600000)))))))))))))))))
+
+head(cardlimit)
+```
+
+
+```{r}
+cardlimit  %>% mutate(BudgetRatio = max_spend / Limit) %>% head()
+```
+
+```{r}
+train <- left_join(train, (cardlimit  %>% select(cardnumber, Limit)), by = "cardnumber")
+```
+
+
+```{r}
+train  %<>% mutate(LimitRatio = TransactionAmt / Limit)
+```
+
+```{r}
+head(train  %>% select(date, isFraud, cardnumber, TransactionAmt, ProductCD))
+```
+
+
+```{r}
+product <- train %>% group_by(cardnumber, ProductCD) %>% 
+    summarise(TransactionSum = sum(TransactionAmt),
+              n = n()) %>% ungroup() %>% 
+    mutate(ProductAmtRatio = n /TransactionSum) %>% 
+    select(cardnumber, ProductCD, ProductAmtRatio)
+head(product)
+```
+
+```{r}
+train <- left_join(train, product, by = c("cardnumber", "ProductCD"))
+```
+
+# Toparlamak gerekirse (train de yapılan tüm işlemler teste aktarıldı)
+
+```{r}
+test <- vroom("../test.csv", delim = ",")
+```
+
+```{r}
+missingtest <- plot_missing(test) 
+missingtest$data %<>% mutate(index = row_number())
+```
+
+
+```{r}
+test_temp <- test %>% 
+  mutate(date_time = ymd(20180701) %>% 
+           as_datetime() %>% add(seconds(TransactionDT))) %>% 
+  select(-TransactionDT) %>% 
+  separate(date_time, c("date", "time"), sep = " ") %>% 
+  mutate(date = ymd(date),
+         quarter = quarter(date),
+         year = year(date),
+         month = month(date),
+         day = day(date),
+         week = week(date),
+         weekday = wday(date, label = TRUE, abbr = FALSE),
+         weekend = if_else(wday(date) %in% c(6,7), TRUE, FALSE),
+         time2 = hms(time),
+         hour = hour(time2),
+         minute = minute(time2),
+         second = second(time2),
+         am_pm = am(time2)) # am or pm
+```
+
+```{r}
+test_temp %<>% mutate(cardnumber = paste(card1, card2, card3, card5, sep = "_"))
+```
+
+
+```{r}
+test_temp %<>% select(-dist2)
+```
+
+```{r}
+test_temp$P_company <- NA_character_
+
+test_temp <- test_temp %>%  
+  mutate(P_company = 
+           as.factor(if_else(P_emaildomain %in% c("yahoo.co.jp", "yahoo.co.uk"," yahoo.com",
+                                        "yahoo.com.mx", "yahoo.de", "yahoo.es", "yahoo.fr", "ymail.com",
+                                        "frontier.com", "frontiernet.net", "rocketmail.com"), "Yahoo",
+                   if_else(P_emaildomain %in% c("hotmail.co.uk", "hotmail.com", "hotmail.de", "hotmail.es",
+                                                "hotmail.fr", "live.com", "live.com.mx", "live.fr",
+                                                "msn.com","outlook.com", "outlook.es"), "Microsoft",
+                           
+                           if_else(P_emaildomain %in% c("icloud.com", "mac.com", "me.com"), "Apple",
+                                   
+                                   if_else(P_emaildomain %in% c("att.net", "prodigy.net.mx", "sbcglobal.net"),
+                                           "AT&T", 
+                                           
+                                           if_else(P_emaildomain %in% c("centurylink.net", "embarqmail.com",
+                                                                        "q.com"), "Centurylink",
+                                                   
+                                                   if_else(P_emaildomain %in% c("aim.com", "aol.com"), "AOL",
+                                                           
+                                                           if_else(P_emaildomain %in% c("charter.net","twc.com"),
+                                                                   "Spectrum", 
+                                                                   if_else(P_emaildomain %in% c("gmail.com","gmail"),
+                                                                   "Google", "Other"))))))))))
+```
+
+
+```{r}
+test_temp %<>% mutate(Country = str_sub(P_emaildomain, start = str_length(P_emaildomain) - 1, end = str_length(P_emaildomain)),
+                   Country = if_else(Country == 'mx', "Mexico",
+                                     if_else(Country == 'es', "Spain",
+                                             if_else(Country == 'jp', "Japan",
+                                                     if_else(Country == 'de', "Germany",
+                                                             if_else(Country == 'fr', "France",
+                                                                     if_else(Country == 'uk', "United Kingdom", "Unknown")))))))
+```
+
+```{r}
+test_temp  %<>% mutate(P_emaildomain2 = P_emaildomain) %>% 
+    separate(P_emaildomain2, c("Dot1", "Dot2", "Dot3")) %>% 
+    mutate(Dot3 = if_else(Dot3 == "com", "com", NA_character_),
+           Dot2 = if_else(Dot2 %in% c("co","com","net"), Dot2, NA_character_)) %>% 
+    unite(Dot, Dot2, Dot3, sep = "") %>% 
+    mutate(Dot = if_else(Dot == "NANA", NA_character_, Dot),
+           Dot = str_remove_all(Dot, "NA"))
+```
+
+```{r}
+test_temp <- test_temp %>% 
+    group_by(cardnumber, P_emaildomain) %>% 
+    mutate(UniqEmail = if_else(row_number() == 1, 1 ,0)) %>% 
+    ungroup() %>% 
+    group_by(cardnumber) %>% 
+    mutate(UniqEmail = cumsum(UniqEmail)) %>% 
+    ungroup() %>% 
+    mutate(UniqEmailProb = UniqEmail / length(unique(P_emaildomain)),
+           UniqEmailCat = if_else(UniqEmail < 20, "Not Yet", "Possible Fraud"))
+```
+
+```{r}
+test_temp %<>% select(-R_emaildomain)
+```
+
+```{r}
+test <- test_temp
+rm(test_temp)
+```
+
+```{r}
+test <- test %>% 
+  # Değişkenler önce mi çıkarılıacak sonra mı?
+  select(-C3, -C11, - C10, -C12, -C6, -C8, -C7) %>% 
+  mutate(Csum = apply(test %>% select(C1:C14), 1, function(x){sum(x, na.rm = TRUE)}),
+         Csd = apply(test %>% select(C1:C14), 1, function(x){sd(x, na.rm = TRUE)}),
+         Cmean = apply(test %>% select(C1:C14), 1, function(x){mean(x, na.rm = TRUE)}),
+         Ckurtosis = apply(test %>% select(C1:C14), 1, function(x){kurtosis(x, na.rm = TRUE)}),
+         Cskewness = apply(test %>% select(C1:C14), 1, function(x){skewness(x, na.rm = TRUE)}),
+         Ckurtosis = if_else(is.na(Ckurtosis) == TRUE, 0, Ckurtosis),
+         Cskewness = if_else(is.na(Cskewness) == TRUE, 0, Cskewness))
+```
+
+```{r}
+missingtest2 <- plot_missing(test)
+```
+
+```{r}
+missingtest2$data %<>% mutate(index = row_number())
+missingD <- missingtest2$data %>% filter(index >= 21, index <= 35, pct_missing > 0.59) %>% pull(index)
+
+test <- test[,-missingD]
+
+rm(missingD)
+```
+
+```{r}
+test %<>% select(-M1, -M7, -M8, -M9)
+```
+
+```{r}
+missingtest3 <- plot_missing(test) 
+
+missingtest3$data %<>% mutate(index = row_number())
+```
+
+```{r}
+mFeature <- missingtest3$data %>% filter(feature %in% paste0("V", 1:339), pct_missing > 0.59) %>% pull(feature)
+```
+
+```{r}
+missingV <- missingtest3$data %>% filter(index >= 34, index <= 372, pct_missing > 0.59) %>% pull(index)
+
+test <- test[,-missingV]
+
+rm(missingV)
+```
+
+```{r}
+test %<>% select(-V1:-V11)
+```
+
+```{r}
+test2 <- test %>% 
+  
+  mutate(
+    
+    #Grup 1
+    Vsum_g1 = apply(test %>% select(V126:V134), 1, function(x){sum(x, na.rm = TRUE)}),
+    Vsd_g1 = apply(test %>% select(V126:V134), 1,  function(x){sd(x, na.rm = TRUE)}),
+    Vmean_g1 = apply(test %>% select(V126:V134), 1,  function(x){mean(x, na.rm = TRUE)}),
+    Vkurtosis_g1 = apply(test %>% select(V126:V134), 1,  function(x){kurtosis(x, na.rm = TRUE)}),
+    Vskewnes_g1 = apply(test %>% select(V126:V134), 1,  function(x){skewness(x, na.rm = TRUE)}),
+    Vkurtosis_g1 = if_else(is.na(Vkurtosis_g1) == TRUE, 0, Vkurtosis_g1),
+    Vskewnes_g1 = if_else(is.na(Vskewnes_g1) == TRUE, 0, Vskewnes_g1),
+    
+    #Grup 2
+    Vsum_g2 = apply(test %>% select(V306:V321), 1, function(x){sum(x, na.rm = TRUE)}),
+    Vsd_g2 = apply(test %>% select(V306:V321), 1,  function(x){sd(x, na.rm = TRUE)}),
+    Vmean_g2 = apply(test %>% select(V306:V321), 1,  function(x){mean(x, na.rm = TRUE)}),
+    Vkurtosis_g2 = apply(test %>% select(V306:V321), 1,  function(x){kurtosis(x, na.rm = TRUE)}),
+    Vskewnes_g2 = apply(test %>% select(V306:V321), 1,  function(x){skewness(x, na.rm = TRUE)}),
+    Vkurtosis_g2 = if_else(is.na(Vkurtosis_g2) == TRUE, 0, Vkurtosis_g2),
+    Vskewnes_g2 = if_else(is.na(Vskewnes_g2) == TRUE, 0, Vskewnes_g2)
+           
+         )
+```
+
+```{r}
+test2 <- test2 %>% select(-V22, -V17, -V16, -V31, -V29, -V34, -V40, -V36, -V48, -V51, -V58, -V60, -V63, -V69,
+                       -V72, -V73, -V80, -V95, -V97, -V102, -V92, -V105, -V90, -V133,-V128, -V134, 
+                       -V126, -V293, -V295, -V298, -V292, -V284, -V302, -V317, -V318, -V316)
+```
+
+```{r}
+test2 %<>% select(-id_27)
+```
+
+```{r}
+test <- test2
+rm(test2)
+```
+
+```{r}
+# Android Eşleşmesi
+
+androidv <-data.frame(
+  
+  id_30 = as.character(c("Android 4.4.2", "Android 5.0",   "Android 5.0.2", "Android 5.1.1", "Android 6.0",   "Android 6.0.1", 
+                         "Android 7.0", "Android 7.1.1", "Android 7.1.2", "Android 8.0.0", "Android 8.1.0","Android 9")),
+  
+  ReleaseDate = as.character(c(2013, rep(2014, 3), rep(2015, 2), rep(2016, 3), rep(2017, 2), 2018))
+)
+androidv$ReleaseDate <- as.character(androidv$ReleaseDate)
+androidv$id_30 <- as.character(androidv$id_30)
+
+
+# Windows
+
+# win_url <- "https://www.wikizeroo.org/index.php?q=aHR0cHM6Ly9lbi53aWtpcGVkaWEub3JnL3dpa2kvTGlzdF9vZl9NaWNyb3NvZnRfV2luZG93c192ZXJzaW9ucw"
+# win_html <- read_html(win_url)
+# windows <- (win_html %>% html_nodes("table"))[[1]] %>% html_table(fill = T)
+
+
+windows <- read.csv("../input/windows/windows.csv")[-1]
+
+windows2 <- windows[, c(1,3)] %>% mutate(Windows.version = as.character(Windows.version),
+                                         Windows.version= if_else(Windows.version == "Windows 1.0", "Windows", Windows.version),
+                                         Release.date = as.character(Release.date)) %>% 
+    rename(id_30 =  Windows.version,
+           ReleaseDate = Release.date) %>% mutate(id_30 = as.character(id_30))
+
+windows2 <- windows2 %>% mutate(ReleaseDate = str_sub(ReleaseDate, start = -4, end= -1)) %>% select(id_30, ReleaseDate)
+```
+
+```{r}
+# iOS
+
+iOS <- data.frame(
+  
+  id_30 = as.character(c(
+    "iOS 9.3.5", "iOS 10.0.2", "iOS 10.1.1", "iOS 10.2.0", "iOS 10.2.1", paste0("iOS 10.3.", 0:9),
+    paste0("iOS 11.0.", 0:9), paste0("iOS 11.1.", 0:9), paste0("iOS 11.2.", 0:9), "iOS 11.3.0", "iOS 11.3.1 ", "iOS 11.4.0", "iOS 11.4.1 ",
+    "iOS 12.0.0", "iOS 12.0.1", "iOS 12.1.0", "iOS 12.1.1", "iOS 12.1.2")),
+  
+  ReleaseDate = as.character(c(2016, 2016,  2016, 2017, 2017, rep(2017,40), rep(2018,9)))
+)
+
+iOS$id_30 <- as.character(iOS$id_30)
+iOS$ReleaseDate <- as.character(iOS$ReleaseDate)
+
+
+
+# Mac OS X
+
+# mac_url <- "https://www.wikizeroo.org/index.php?q=aHR0cHM6Ly90ci53aWtpcGVkaWEub3JnL3dpa2kvTWFjT1M"
+# mac_html <- read_html(mac_url)
+
+# mac <- (mac_html %>% html_nodes("table"))[[2]] %>% html_table(fill = T)
+
+# mac <- mac[-1:-4,c(1,3)] %>% 
+#  mutate(Sürüm = if_else(row_number() %in% 9:12, paste0("Mac ", Sürüm), Sürüm),
+#         Sürüm = if_else(row_number() %in% 13:16, paste0("Mac OS X ", str_sub(Sürüm, start = 7)), Sürüm)) %>% 
+#  rename(id_30 = Sürüm, ReleaseDate = `Tanıtım Tarihi`) %>% 
+#  mutate(ReleaseDate = str_sub(ReleaseDate, start = -4, end = -1))
+
+# mac <- mac %>% rename(id_30_2 = id_30)
+
+# mm <- c(paste0("Mac OS X 10.", 0:9, "."), paste0("Mac OS X 10_", 0:9, "_"))
+# mac2 <- train %>% select(id_30) %>% mutate(id_30_2 = str_sub(id_30, start = 1 , end = 14),
+#                                          id_30_2 = if_else(id_30_2 %in% mm,
+#                                                         str_sub(id_30_2, end = 13), id_30_2),
+#                                          id_30_2 = str_replace_all(id_30_2 , "_", ".")) %>% left_join(mac, by = "id_30_2") %>% 
+#   na.omit() %>% distinct() %>% select(-id_30_2)
+
+mac2 <- read.csv("../input/macosx2/mac2.csv")[-1]
+mac2$id_30 <- as.character(mac2$id_30)
+mac2$ReleaseDate <- as.character(mac2$ReleaseDate)
+```
+
+```{r}
+versions <-  bind_rows(androidv, windows2, iOS, mac2)
+```
+
+```{r}
+test2 <- dplyr::left_join(test, versions, by = "id_30")
+
+test2$ReleaseDate  <- as.numeric(test2$ReleaseDate)
+
+test2$id_30 <- str_replace_all(test2$id_30, "_", ".")
+```
+
+```{r}
+test2 <- test2 %>% mutate(TrVersion = year - ReleaseDate)
+```
+
+```{r}
+test2 <- test2  %>% 
+    mutate(OpSystem = if_else(
+        str_sub(id_30, start = 1, end = 3) %in% "Mac", "Mac",
+        if_else(is.na(id_30), "other",
+                if_else(str_sub(id_30, start = 1, end = 7) %in% "Windows", "Windows",
+                        if_else(str_sub(id_30, start = 1, end = 7) %in% "Android", "Android",
+                                if_else(str_sub(id_30, start = 1, end = 3) %in% "iOS", "iOS",
+                                        if_else(id_30 %in% "Linux", "Linux",
+                                                if_else(id_30 %in% "func", "other", "other")
+                                               )))))))
+```
+
+```{r}
+# Günlük transaction sayısı
+test2 %<>% mutate(TransactionFreqDaily = 1) %>%  
+  group_by(date, cardnumber) %>% 
+  mutate(TransactionFreqDaily = cumsum(TransactionFreqDaily))
+
+# günlük saatlik transaction sayısı 
+test2  %<>% mutate(TransactionFreqHour = 1) %>%  
+  group_by(date, hour, cardnumber) %>% 
+  mutate(TransactionFreqHour = cumsum(TransactionFreqHour)) 
+
+# Hangi saat diliminde transaction saısı
+test2 %<>% mutate(TransactionFreqAMPM = 1) %>%  
+  group_by(date, am_pm, cardnumber) %>% 
+  mutate(TransactionFreqAMPM = cumsum(TransactionFreqAMPM)) 
+
+# Aylık transaction sayısı
+test2 %<>% mutate(TransactionFreqMonthly = 1) %>%  
+  group_by(year, month, cardnumber) %>% 
+  mutate(TransactionFreqMonthly = cumsum(TransactionFreqMonthly))
+```
+
+```{r}
+test2  %<>% mutate(ZipCountry = paste0(addr1, addr2)) %>% 
+    group_by(cardnumber, ZipCountry) %>% 
+    mutate(UniqCountry = if_else(row_number() == 1, 1 ,0)) %>% 
+    ungroup() %>% 
+    group_by(cardnumber) %>% 
+    mutate(UniqCountry = cumsum(UniqCountry)) %>% 
+    ungroup() %>% 
+    mutate(CountryProb = UniqCountry / length(unique(ZipCountry)),
+           UniqCountryCat = if_else(UniqCountry < 31, "Not Yet", "Possible Fraud"))
+```
+
+```{r}
+test <- test2
+rm(test2)
+```
+
+```{r}
+limit <- test %>% select(year,month, cardnumber, TransactionAmt, card6, card4)
+
+limit2 <- limit %>%  group_by(year,month, cardnumber, card6, card4) %>% 
+                     summarise(Spend = sum(TransactionAmt))
+```
+
+```{r}
+limit_max <- limit2 %>%
+    group_by(cardnumber) %>% 
+    summarise(max_spend = max(Spend))
+```
+
+```{r}
+cardlimit <- limit_max %>% mutate(Limit = if_else(max_spend < 500, 500, 
+                                           if_else(max_spend < 1200, 1500,
+                                                   if_else(max_spend < 2200, 3500,
+                                                           if_else(max_spend < 4500, 5000,
+                                                                   if_else(max_spend < 7000, 9000, 
+                                                                           if_else(max_spend < 10000, 14000,
+                                                                                   if_else(max_spend < 15000, 20000,
+                                                                                           if_else(max_spend < 20000, 30000,
+                                                                                                   if_else(max_spend < 30000, 40000,
+                                                                                                           if_else(max_spend < 50000,60000,
+                                                                                                                   if_else(max_spend < 90000, 120000,
+                                                                                                                           if_else(max_spend < 140000, 180000,
+                                                                                                                                   if_else(max_spend < 200000, 250000,
+                                                                                                                                           if_else(max_spend < 260000, 300000,
+                                                                                                                                                   if_else(max_spend < 320000, 360000,
+                                                                                                                                                           if_else(max_spend < 390000, 450000, 600000)))))))))))))))))
+```
+
+```{r}
+test2 <- left_join(test, (cardlimit  %>% select(cardnumber, Limit)), by = "cardnumber")
+```
+
+```{r}
+product <- test2 %>% group_by(cardnumber, ProductCD) %>% 
+    summarise(TransactionSum = sum(TransactionAmt),
+              n = n()) %>% ungroup() %>% 
+    mutate(ProductAmtRatio = n /TransactionSum) %>% 
+    select(cardnumber, ProductCD, ProductAmtRatio)
+```
+
+```{r}
+test2 <- left_join(test2, product, by = c("cardnumber", "ProductCD"))
+```
+
+```{r}
+test <- test2
+rm(test2)
+```
+
+```{r}
+train_columns_names = list('TransactionAmt', 'ProductCD', 'card1', 'card2', 'card3', 'card4', 'card5', 'card6', 'addr1', 'addr2', 'dist1', 'P_emaildomain', 'C1' ,'C2', 'C4' ,'C5', 'C9', 'C13',
+                       'C14', 'D1' ,'D2' ,'D3', 'D4' ,'D5' ,'D10', 'D11', 'D15' ,'M2' ,'M3' ,'M4', 'M5', 'M6', 'V12', 'V13' ,'V14', 'V15', 'V18' ,'V19', 'V20', 'V21', 'V23', 'V24', 'V25',
+                       'V26' ,'V27', 'V28' ,'V30', 'V32', 'V33' ,'V35', 'V37', 'V38', 'V39', 'V41' ,'V42', 'V43', 'V44', 'V45', 'V46', 'V47', 'V49', 'V50', 'V52', 'V53', 'V54' ,'V55',
+                       'V56', 'V57', 'V59','V61', 'V62', 'V64', 'V65', 'V66', 'V67', 'V68', 'V70', 'V71', 'V74', 'V75', 'V76', 'V77', 'V78', 'V79', 'V81', 'V82', 'V83', 'V84', 'V85', 'V86',
+                       'V87', 'V88', 'V89', 'V91', 'V93', 'V94', 'V96', 'V98' ,'V99' ,'V100', 'V101' ,'V103' ,'V104', 'V106', 'V107' ,'V108' ,'V109' ,'V110' ,'V111' ,'V112', 'V113', 'V114',
+                       'V115', 'V116' ,'V117', 'V118', 'V119' ,'V120' ,'V121', 'V122', 'V123', 'V124', 'V125', 'V127', 'V129', 'V130' ,'V131' ,'V132', 'V135', 'V136', 'V137', 'V279', 'V280',
+                       'V281', 'V282', 'V283' ,'V285' ,'V286', 'V287', 'V288', 'V289', 'V290', 'V291' ,'V294', 'V296', 'V297', 'V299', 'V300', 'V301', 'V303', 'V304', 'V305', 'V306', 'V307',
+                       'V308', 'V309', 'V310', 'V311', 'V312' ,'V313', 'V314', 'V315', 'V319', 'V320', 'V321', 'V339', 'id_01', 'id_02', 'id_03', 'id_04', 'id_05', 'id_06', 'id_07', 'id_08',
+                       'id_09', 'id_10', 'id_11', 'id_12', 'id_13', 'id_14', 'id_15', 'id_16', 'id_17', 'id_18', 'id_19' ,'id_20', 'id_21' ,'id_22', 'id_23', 'id_24', 'id_25', 'id_26',
+                       'id_28' ,'id_29' ,'id_30' ,'id_31', 'id_32' ,'id_33', 'id_34' ,'id_35' ,'id_36' ,'id_37', 'id_38', 'DeviceType', 'DeviceInfo' ,'date', 'time', 'quarter' ,'year', 'month',
+                       'day', 'week', 'weekday' ,'weekend' ,'time2' ,'hour', 'minute', 'second', 'am_pm', 'cardnumber', 'P_company', 'Country', 'Dot1', 'Dot' , 'UniqEmail',
+                       'UniqEmailProb', 'UniqEmailCat', 'Csum', 'Csd', 'Cmean', 'Ckurtosis', 'Cskewness', 'Vsum_g1', 'Vsd_g1', 'Vmean_g1' ,'Vkurtosis_g1', 'Vskewnes_g1' ,'Vsum_g2', 'Vsd_g2' ,
+                       'Vmean_g2' ,'Vkurtosis_g2' ,'Vskewnes_g2', 'UniqDevice', 'Uniq.Device.Cat', 'DeviceProb', 'ReleaseDate', 'TrVersion', 'OpSystem', 'TransactionFreqDaily',
+                       'TransactionFreqHour', 'TransactionFreqAMPM', 'TransactionFreqMonthly', 'ZipCountry', 'UniqCountry', 'CountryProb', 'UniqCountryCat', 'Limit', 'LimitRatio' ,'ProductAmtRatio')
+```
+
+```{r}
+test <- test[, (names(test) %in% c('TransactionAmt', 'ProductCD', 'card1', 'card2', 'card3', 'card4', 'card5', 'card6', 'addr1', 'addr2', 'dist1', 'P_emaildomain', 'C1' ,'C2', 'C4' ,'C5', 'C9', 'C13',
+                       'C14', 'D1' ,'D2' ,'D3', 'D4' ,'D5' ,'D10', 'D11', 'D15' ,'M2' ,'M3' ,'M4', 'M5', 'M6', 'V12', 'V13' ,'V14', 'V15', 'V18' ,'V19', 'V20', 'V21', 'V23', 'V24', 'V25',
+                       'V26' ,'V27', 'V28' ,'V30', 'V32', 'V33' ,'V35', 'V37', 'V38', 'V39', 'V41' ,'V42', 'V43', 'V44', 'V45', 'V46', 'V47', 'V49', 'V50', 'V52', 'V53', 'V54' ,'V55',
+                       'V56', 'V57', 'V59','V61', 'V62', 'V64', 'V65', 'V66', 'V67', 'V68', 'V70', 'V71', 'V74', 'V75', 'V76', 'V77', 'V78', 'V79', 'V81', 'V82', 'V83', 'V84', 'V85', 'V86',
+                       'V87', 'V88', 'V89', 'V91', 'V93', 'V94', 'V96', 'V98' ,'V99' ,'V100', 'V101' ,'V103' ,'V104', 'V106', 'V107' ,'V108' ,'V109' ,'V110' ,'V111' ,'V112', 'V113', 'V114',
+                       'V115', 'V116' ,'V117', 'V118', 'V119' ,'V120' ,'V121', 'V122', 'V123', 'V124', 'V125', 'V127', 'V129', 'V130' ,'V131' ,'V132', 'V135', 'V136', 'V137', 'V279', 'V280',
+                       'V281', 'V282', 'V283' ,'V285' ,'V286', 'V287', 'V288', 'V289', 'V290', 'V291' ,'V294', 'V296', 'V297', 'V299', 'V300', 'V301', 'V303', 'V304', 'V305', 'V306', 'V307',
+                       'V308', 'V309', 'V310', 'V311', 'V312' ,'V313', 'V314', 'V315', 'V319', 'V320', 'V321', 'V339', 'id_01', 'id_02', 'id_03', 'id_04', 'id_05', 'id_06', 'id_07', 'id_08',
+                       'id_09', 'id_10', 'id_11', 'id_12', 'id_13', 'id_14', 'id_15', 'id_16', 'id_17', 'id_18', 'id_19' ,'id_20', 'id_21' ,'id_22', 'id_23', 'id_24', 'id_25', 'id_26',
+                       'id_28' ,'id_29' ,'id_30' ,'id_31', 'id_32' ,'id_33', 'id_34' ,'id_35' ,'id_36' ,'id_37', 'id_38', 'DeviceType', 'DeviceInfo' ,'date', 'time', 'quarter' ,'year', 'month',
+                       'day', 'week', 'weekday' ,'weekend' ,'time2' ,'hour', 'minute', 'second', 'am_pm', 'cardnumber', 'P_company', 'Country', 'Dot1', 'Dot' , 'UniqEmail',
+                       'UniqEmailProb', 'UniqEmailCat', 'Csum', 'Csd', 'Cmean', 'Ckurtosis', 'Cskewness', 'Vsum_g1', 'Vsd_g1', 'Vmean_g1' ,'Vkurtosis_g1', 'Vskewnes_g1' ,'Vsum_g2', 'Vsd_g2' ,
+                       'Vmean_g2' ,'Vkurtosis_g2' ,'Vskewnes_g2', 'UniqDevice', 'Uniq.Device.Cat', 'DeviceProb', 'ReleaseDate', 'TrVersion', 'OpSystem', 'TransactionFreqDaily',
+                       'TransactionFreqHour', 'TransactionFreqAMPM', 'TransactionFreqMonthly', 'ZipCountry', 'UniqCountry', 'CountryProb', 'UniqCountryCat', 'Limit', 'LimitRatio' ,'ProductAmtRatio'))]
+```
+
+```{r}
+write.csv(test, "test_1.csv")
+```
+
+# Buradan sonra Python a geçildi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
